@@ -275,7 +275,7 @@ namespace DevicesSpecification
                         }
                 }
             }
-
+            //29 24
             loging(0, "Формирование выходных данных успешно завершено");
 
             object[,] arr = new object[result.Count, 9];
@@ -294,7 +294,22 @@ namespace DevicesSpecification
                 //arr[i, 7] = el.Number;
                 arr[i, 8] = el.ColI;
             }
-            
+
+            string templateFileName = Directory.GetCurrentDirectory() + "\\Шаблон.xlsx";
+            if (!File.Exists(templateFileName))
+                throw new Exception("не найден шаблон выходного файла");
+
+            Excel.Application xlApp = new Excel.Application();
+            Excel.Workbook xlWB;
+            Excel.Worksheet xlSht;
+            xlWB = xlApp.Workbooks.Open(templateFileName);
+            xlSht = (Excel.Worksheet)xlWB.Worksheets[2];
+            // string shtName = tmp.Replace('/', '_');
+            Excel.Range range = xlSht.get_Range("A3", "I" + (result.Count + 3).ToString());
+            range.Value = arr;
+            xlWB.Save();
+            xlWB.Close(false);
+            xlApp.Quit();
         }
 
         public void loadFilters()
