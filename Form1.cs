@@ -224,17 +224,39 @@ namespace DevicesSpecification
         {
             
             loging(0, "Формирование выходных данных");
+            
+            string templateFileName = Directory.GetCurrentDirectory() + "\\Шаблон.xlsx";
+            if (!File.Exists(templateFileName))
+                throw new Exception("не найден шаблон выходного файла");
+
+            string tmpFileName = textBox1.Text.Split('\\').Last();
+            string tmpDirName = textBox1.Text.Replace(".xlsx", "_result");
+            if (!Directory.Exists(tmpDirName))
+                Directory.CreateDirectory(tmpDirName);
+
+            Excel.Application xlApp = new Excel.Application();
+            Excel.Workbook xlWB;
+            Excel.Worksheet xlSht;
+            
+            xlWB = xlApp.Workbooks.Open(templateFileName);
+            List<int> caption1List = new List<int>();
+            List<int> caption2List = new List<int>();
+
             List<ShB_elem> result = new List<ShB_elem>();
             foreach (string city in PU.Keys)
             {
                 foreach (string fider in PU[city].Keys)
                 {
                     result.Add(new ShB_elem("", city + " " + fider, "", "", 0, ""));
+                    caption1List.Add(result.Count+3 + incrementIndex(result.Count));
+
                     foreach (RP_elem RP in PU[city][fider])
                     {
                         string varName = RP.Name;
                         int varCount = RP.Count;
                         result.Add(new ShB_elem("", varName, "", "", 0, ""));
+                        caption2List.Add(result.Count+ 3 + incrementIndex(result.Count));
+
                         try
                         {
                             foreach (ShB_elem el in ListShB2[varName.Replace("№", "")])
@@ -252,6 +274,9 @@ namespace DevicesSpecification
                     if (TT.ContainsKey(city) & TT[city].ContainsKey(fider))
                         foreach (string varName2 in TT[city][fider].Keys)
                         {
+                            result.Add(new ShB_elem("", varName2, "", "", 0, ""));
+                            caption2List.Add(result.Count+ 3 + incrementIndex(result.Count));
+
                             int varCount2 = 0;
                             foreach (RP_elem RP in TT[city][fider][varName2])                            
                                 varCount2 = varCount2 + RP.Count;
@@ -274,42 +299,76 @@ namespace DevicesSpecification
                             }
                         }
                 }
+                object[,] arr = new object[result.Count, 9];
+
+                int i = -1;
+                foreach (ShB_elem el in result)
+                {
+                    i++;
+                    arr[i, 0] = el.Number;
+                    arr[i, 1] = el.Name;
+                    arr[i, 2] = el.ColC;
+                    //arr[i, 3] = el.Number;
+                    //arr[i, 4] = el.Number;
+                    arr[i, 5] = el.ColF;
+                    arr[i, 6] = el.Count;
+                    //arr[i, 7] = el.Number;
+                    arr[i, 8] = el.ColI;
+                }
+
+                double pageCount1 = (result.Count - 24) / 29;
+                double pageCount2 = Math.Ceiling(pageCount1)+1;
+                double pageCount = (pageCount1 > 0) ? 39 + pageCount2 * 37 : 39;               
+
+                xlSht = (Excel.Worksheet)xlWB.Worksheets[2];
+                xlSht.Cells.ClearContents();
+                
+                Excel.Range range = xlSht.get_Range("A3", "I" + (result.Count + 2).ToString());
+                range.Value = arr;
+
+                xlSht = (Excel.Worksheet)xlWB.Worksheets[3];
+                string shtName = city;
+                xlSht.PageSetup.PrintArea = "$A$2:$AA$"+ pageCount.ToString();
+
+                foreach (int rowNum in caption1List)
+                {
+                    range = xlSht.get_Range("J" + rowNum.ToString());
+                    range.Font.Bold = true;
+                    range.Font.Size = 18;
+                }
+
+                foreach (int rowNum in caption2List)
+                {
+                    range = xlSht.get_Range("J" + rowNum.ToString());
+                    range.Font.Bold = true;
+                    range.Font.Size = 14;
+                }
+
+                string newFileFullName = tmpDirName + "\\" + tmpFileName.Replace(".xlsx", "_" + city + ".xlsx");
+                xlWB.SaveAs(newFileFullName);
+                xlSht.ExportAsFixedFormat(Excel.XlFixedFormatType.xlTypePDF, newFileFullName.Replace(".xlsx", ".pdf"));
+                loging(0, "Файл успешно сохранен: " + newFileFullName);
+                result.Clear();
+                caption1List.Clear();
+                caption2List.Clear();
             }
             //29 24
-            loging(0, "Формирование выходных данных успешно завершено");
-
-            object[,] arr = new object[result.Count, 9];
-
-            int i = -1;
-            foreach (ShB_elem el in result)
-            {
-                i++;
-                arr[i, 0] = el.Number;
-                arr[i, 1] = el.Name;
-                arr[i, 2] = el.ColC;
-                //arr[i, 3] = el.Number;
-                //arr[i, 4] = el.Number;
-                arr[i, 5] = el.ColF;
-                arr[i, 6] = el.Count;
-                //arr[i, 7] = el.Number;
-                arr[i, 8] = el.ColI;
-            }
-
-            string templateFileName = Directory.GetCurrentDirectory() + "\\Шаблон.xlsx";
-            if (!File.Exists(templateFileName))
-                throw new Exception("не найден шаблон выходного файла");
-
-            Excel.Application xlApp = new Excel.Application();
-            Excel.Workbook xlWB;
-            Excel.Worksheet xlSht;
-            xlWB = xlApp.Workbooks.Open(templateFileName);
-            xlSht = (Excel.Worksheet)xlWB.Worksheets[2];
-            // string shtName = tmp.Replace('/', '_');
-            Excel.Range range = xlSht.get_Range("A3", "I" + (result.Count + 3).ToString());
-            range.Value = arr;
-            xlWB.Save();
             xlWB.Close(false);
             xlApp.Quit();
+            loging(0, "Формирование выходных данных успешно завершено");
+            
+        }
+
+        public int incrementIndex(double rowCount)
+        {
+            int result = 0;
+            double pageCount1 = Math.Ceiling((rowCount - 24) / 29);
+            int pageCount = Convert.ToInt32(pageCount1);
+            if (pageCount > 0)
+                result = 15 + (pageCount - 1) * 8;
+            if (pageCount > 8)
+                result++;
+            return result;
         }
 
         public void loadFilters()
