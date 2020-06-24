@@ -147,7 +147,7 @@ namespace DevicesSpecification
                                 getStringFromXML(arrData2[i, 3]),
                                 getStringFromXML(arrData2[i, 6]),
                                 getIntFromXML(arrData2[i, 7]),
-                                getStringFromXML(arrData[i, 9])));
+                                getStringFromXML(arrData2[i, 9])));
                     }
                 }
                 ListShB2.Add(variatName, aList);
@@ -236,15 +236,17 @@ namespace DevicesSpecification
 
             Excel.Application xlApp = new Excel.Application();
             Excel.Workbook xlWB;
-            Excel.Worksheet xlSht;
+            Excel.Worksheet xlSht; 
             
-            xlWB = xlApp.Workbooks.Open(templateFileName);
-            List<int> caption1List = new List<int>();
-            List<int> caption2List = new List<int>();
 
-            List<ShB_elem> result = new List<ShB_elem>();
+            
             foreach (string city in PU.Keys)
             {
+                
+                List<int> caption1List = new List<int>();
+                List<int> caption2List = new List<int>();
+                List<int> londTextList = new List<int>();
+                List<ShB_elem> result = new List<ShB_elem>();
                 foreach (string fider in PU[city].Keys)
                 {
                     result.Add(new ShB_elem("", city + " " + fider, "", "", 0, ""));
@@ -264,6 +266,7 @@ namespace DevicesSpecification
                                 ShB_elem newEl = el;
                                 newEl.Count = newEl.Count * varCount;
                                 result.Add(newEl);
+                                if (newEl.ColC.Length > 24) londTextList.Add(result.Count + 3 + incrementIndex(result.Count));
                             }
                         }
                         catch (Exception ex)
@@ -295,6 +298,7 @@ namespace DevicesSpecification
                                 ShB_elem TP = ListShB1[varName2].Last();
                                 TP.ColC = "ТОП-0,66 У3 "+ rpName +"/ 5 0,5S";
                                 TP.Number = (Int32.Parse(TP.Number) + index).ToString();
+                                TP.Count = TP.Count * RP.Count;
                                 result.Add(TP);
                             }
                         }
@@ -316,10 +320,11 @@ namespace DevicesSpecification
                     arr[i, 8] = el.ColI;
                 }
 
-                double pageCount1 = (result.Count - 24) / 29;
+                double pageCount1 = (result.Count - 23) / 29;
                 double pageCount2 = Math.Ceiling(pageCount1)+1;
-                double pageCount = (pageCount1 > 0) ? 39 + pageCount2 * 37 : 39;               
+                double pageCount = (pageCount1 > 0) ? 39 + pageCount2 * 37 : 39;
 
+                xlWB = xlApp.Workbooks.Open(templateFileName);
                 xlSht = (Excel.Worksheet)xlWB.Worksheets[2];
                 xlSht.Cells.ClearContents();
                 
@@ -329,6 +334,10 @@ namespace DevicesSpecification
                 xlSht = (Excel.Worksheet)xlWB.Worksheets[3];
                 string shtName = city;
                 xlSht.PageSetup.PrintArea = "$A$2:$AA$"+ pageCount.ToString();
+               
+                xlSht.get_Range("Z35").Value = (pageCount2+1).ToString();
+                xlSht.get_Range("R34").Value = DateTime.Now.ToString("dd.MM.yyy");
+                xlSht.get_Range("S34").Value = city;
 
                 foreach (int rowNum in caption1List)
                 {
@@ -344,6 +353,12 @@ namespace DevicesSpecification
                     range.Font.Size = 14;
                 }
 
+                foreach (int rowNum in londTextList)
+                {
+                    range = xlSht.get_Range("K" + rowNum.ToString());
+                    range.Font.Size = 10;
+                }
+
                 string newFileFullName = tmpDirName + "\\" + tmpFileName.Replace(".xlsx", "_" + city + ".xlsx");
                 xlWB.SaveAs(newFileFullName);
                 xlSht.ExportAsFixedFormat(Excel.XlFixedFormatType.xlTypePDF, newFileFullName.Replace(".xlsx", ".pdf"));
@@ -351,9 +366,10 @@ namespace DevicesSpecification
                 result.Clear();
                 caption1List.Clear();
                 caption2List.Clear();
+                xlWB.Close(false);
             }
             //29 24
-            xlWB.Close(false);
+            
             xlApp.Quit();
             loging(0, "Формирование выходных данных успешно завершено");
             
@@ -362,7 +378,7 @@ namespace DevicesSpecification
         public int incrementIndex(double rowCount)
         {
             int result = 0;
-            double pageCount1 = Math.Ceiling((rowCount - 24) / 29);
+            double pageCount1 = Math.Ceiling((rowCount - 23) / 29);
             int pageCount = Convert.ToInt32(pageCount1);
             if (pageCount > 0)
                 result = 15 + (pageCount - 1) * 8;
