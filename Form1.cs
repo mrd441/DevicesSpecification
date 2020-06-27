@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design.Serialization;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -19,6 +20,7 @@ namespace DevicesSpecification
                 Number = aNumber;
                 Name = aName;
                 ColC = aColC;
+                ColD = "";
                 ColF = aColF;
                 Count = aCount;
                 ColI = aColI;
@@ -26,12 +28,16 @@ namespace DevicesSpecification
             public string Number { get; set; }
             public string Name { get; }
             public string ColC { get; set; }
+            public string ColD { get; set; }
             public string ColF { get; }
             public string ColI { get; }
             public int Count { get; set; }
         };
         public Dictionary<string, List<ShB_elem>> ListShB1;// = new Dictionary<string, ShB1_elem>();
         public Dictionary<string, List<ShB_elem>> ListShB2;// = new Dictionary<string, ShB1_elem>();
+
+        public Dictionary<string, Dictionary<string, string>> shifrs;
+        public Dictionary<string, string> tt2List;
 
         public struct RP_elem
         {
@@ -59,10 +65,12 @@ namespace DevicesSpecification
         {
             ListShB1 = new Dictionary<string, List<ShB_elem>>();
             ListShB2 = new Dictionary<string, List<ShB_elem>>();
+            tt2List = new Dictionary<string, string>();
             USPD = new Dictionary<string, Dictionary<string, List<RP_elem>>>();
             PU = new Dictionary<string, Dictionary<string, List<RP_elem>>>();
             TT = new Dictionary<string, Dictionary<string, Dictionary<string, List<RP_elem>>>>();
             await Task.Run(() => LoadSettings(Directory.GetCurrentDirectory() + "\\Варианты устройства ТТ, Отвл.xlsx"));
+            await Task.Run(() => LoadShifrs(Directory.GetCurrentDirectory() + "\\Шифры для состава проекта.xlsx"));
             listBox1.Items.AddRange(ListShB1.Keys.ToArray());
             listBox2.Items.AddRange(ListShB2.Keys.ToArray());
             isLoading(false);
@@ -160,6 +168,59 @@ namespace DevicesSpecification
             isLoading(false);
         }
 
+        public void LoadShifrs(string file)
+        {
+            try
+            {
+                loging(1, "Загрузка шифров...");
+                isLoading(true);
+                shifrs = new Dictionary<string, Dictionary<string, string>>();
+                Excel.Application xlApp = new Excel.Application();
+                Excel.Workbook xlWB;
+                Excel.Worksheet xlSht;
+                xlWB = xlApp.Workbooks.Open(file);
+
+                xlSht = (Excel.Worksheet)xlWB.Worksheets[6];
+                Excel.Range last = xlSht.Cells.SpecialCells(Excel.XlCellType.xlCellTypeLastCell, Type.Missing);
+                var arrData = (object[,])xlSht.get_Range("A1", last).Value;
+
+                xlWB.Close(false);
+                xlApp.Quit();
+
+                int rowCount = arrData.GetUpperBound(0);
+                int colCount = arrData.GetUpperBound(1);
+                if (colCount < 9) throw new Exception("Не верные вхрдные данные ШБ.");
+
+                for (int i = 1; i <= rowCount; i++)
+                {
+                    string resName = getStringFromXML(arrData[i, 3]).Trim();
+                    string psName = getStringFromXML(arrData[i, 4]).Trim();
+                    string tksName = getStringFromXML(arrData[i, 9]).Trim();
+                    if (!shifrs.ContainsKey(resName))
+                        shifrs.Add(resName, new Dictionary<string, string>());
+                    if (!shifrs[resName].ContainsKey(psName))
+                        shifrs[resName].Add(psName,tksName);
+                }
+                
+                loging(1, "Файл успешно загружен: " + file + ";");
+            }
+            catch (Exception ex)
+            {
+                loging(2, "Ошибка загрузки Excel файла: " + file + " ; " + ex.Message);
+            }
+            isLoading(false);
+        }
+
+        public string getShifr(string resName, string psName)
+        {
+            resName = resName.Trim();
+            psName = psName.Trim();
+            if (shifrs.ContainsKey(resName) && shifrs[resName].ContainsKey(psName))
+                return shifrs[resName][psName];
+            else
+                return "";
+        }
+
         private string getStringFromXML(object data)
         {
             string test = "";
@@ -229,7 +290,9 @@ namespace DevicesSpecification
             if (!File.Exists(templateFileName))
                 throw new Exception("не найден шаблон выходного файла");
 
+            
             string tmpFileName = textBox1.Text.Split('\\').Last();
+            string resName = tmpFileName.Replace(" Реестр потребителей.xlsx", "");
             string tmpDirName = textBox1.Text.Replace(".xlsx", "_result");
             if (!Directory.Exists(tmpDirName))
                 Directory.CreateDirectory(tmpDirName);
@@ -242,7 +305,7 @@ namespace DevicesSpecification
             
             foreach (string city in PU.Keys)
             {
-                
+                bool ttError = false;
                 List<int> caption1List = new List<int>();
                 List<int> caption2List = new List<int>();
                 List<int> londTextList = new List<int>();
@@ -294,11 +357,20 @@ namespace DevicesSpecification
                             int index = 0;
                             foreach (RP_elem RP in TT[city][fider][varName2])
                             {
-                                string rpName = RP.Name.Replace("/5", "").Replace("А","");
+                                string rpName = "!00";
+                                string vaName = "";
+                                if (RP.Name.Contains('/'))
+                                    rpName = RP.Name.Replace("/5", "").Replace("А", "");
+                                else
+                                {
+                                    vaName = getVaName(city,fider,varName2);
+                                    ttError = true;
+                                }
                                 ShB_elem TP = ListShB1[varName2].Last();
                                 TP.ColC = "ТОП-0,66 У3 "+ rpName +"/ 5 0,5S";
                                 TP.Number = (Int32.Parse(TP.Number) + index).ToString();
                                 TP.Count = TP.Count * RP.Count;
+                                TP.ColD = vaName;
                                 result.Add(TP);
                             }
                         }
@@ -312,8 +384,8 @@ namespace DevicesSpecification
                     arr[i, 0] = el.Number;
                     arr[i, 1] = el.Name;
                     arr[i, 2] = el.ColC;
-                    //arr[i, 3] = el.Number;
-                    //arr[i, 4] = el.Number;
+                    arr[i, 3] = el.ColD;
+                    //arr[i, 4] = el.ColE;
                     arr[i, 5] = el.ColF;
                     arr[i, 6] = el.Count;
                     //arr[i, 7] = el.Number;
@@ -330,6 +402,13 @@ namespace DevicesSpecification
                 
                 Excel.Range range = xlSht.get_Range("A3", "I" + (result.Count + 2).ToString());
                 range.Value = arr;
+
+                xlSht = (Excel.Worksheet)xlWB.Worksheets[1];
+                xlSht.get_Range("B5").Value = resName;
+                string shifrName = getShifr(resName, city);
+                xlSht.get_Range("A17").Value = shifrName;
+                if (shifrName == "")
+                    loging(2, "не найден шифр для " + resName + " " + city);
 
                 xlSht = (Excel.Worksheet)xlWB.Worksheets[3];
                 string shtName = city;
@@ -359,10 +438,17 @@ namespace DevicesSpecification
                     range.Font.Size = 10;
                 }
 
-                string newFileFullName = tmpDirName + "\\" + tmpFileName.Replace(".xlsx", "_" + city + ".xlsx");
+                
+                string newFileFullName = tmpDirName + "\\";// + tmpFileName.Replace(".xlsx", "_" + city + ".xlsx");
+                if (ttError)
+                    newFileFullName = newFileFullName + "!!";
+                newFileFullName  = newFileFullName + tmpFileName.Replace(".xlsx", "_" + city + ".xlsx");
                 xlWB.SaveAs(newFileFullName);
                 xlSht.ExportAsFixedFormat(Excel.XlFixedFormatType.xlTypePDF, newFileFullName.Replace(".xlsx", ".pdf"));
-                loging(0, "Файл успешно сохранен: " + newFileFullName);
+                if (ttError)
+                    loging(2, "Файл сохранен с ошибкой: " + newFileFullName);
+                else
+                    loging(0, "Файл успешно сохранен: " + newFileFullName);
                 result.Clear();
                 caption1List.Clear();
                 caption2List.Clear();
@@ -384,6 +470,8 @@ namespace DevicesSpecification
                 result = 15 + (pageCount - 1) * 8;
             if (pageCount > 8)
                 result++;
+            if (pageCount == 9)
+                result++;
             return result;
         }
 
@@ -392,6 +480,7 @@ namespace DevicesSpecification
             TT.Clear();
             USPD.Clear();
             PU.Clear();
+            tt2List.Clear();
             loging(0, "Чтение файла");
             Excel.Application xlApp = new Excel.Application();
             Excel.Workbook xlWB;
@@ -404,9 +493,9 @@ namespace DevicesSpecification
             //Object[] myObjArray = new Object[1] {"[Кол-во неопрашиваемых ПУ].[Опорная ПС].&[ПО Уркарах Новая]"};
             //asd.VisibleSlicerItemsList = myObjArray;
 
-            xlSht = (Excel.Worksheet)xlWB.Worksheets[9];
-            last = xlSht.Cells.SpecialCells(Excel.XlCellType.xlCellTypeLastCell, Type.Missing);
-            var arrData = (object[,])xlSht.get_Range("A1", last).Value;
+            //xlSht = (Excel.Worksheet)xlWB.Worksheets[9];
+            //last = xlSht.Cells.SpecialCells(Excel.XlCellType.xlCellTypeLastCell, Type.Missing);
+            //var arrData = (object[,])xlSht.get_Range("A1", last).Value;
 
             xlSht = (Excel.Worksheet)xlWB.Worksheets[10];
             last = xlSht.Cells.SpecialCells(Excel.XlCellType.xlCellTypeLastCell, Type.Missing);
@@ -416,60 +505,64 @@ namespace DevicesSpecification
             last = xlSht.Cells.SpecialCells(Excel.XlCellType.xlCellTypeLastCell, Type.Missing);
             var arrData3 = (object[,])xlSht.get_Range("A1", last).Value;
 
+            xlSht = (Excel.Worksheet)xlWB.Worksheets[3];
+            last = xlSht.Cells.SpecialCells(Excel.XlCellType.xlCellTypeLastCell, Type.Missing);
+            var arrData4 = (object[,])xlSht.get_Range("A1", last).Value;
+
             xlWB.Close(false);
             xlApp.Quit();
 
-            int rowCount = arrData.GetUpperBound(0);
-            int colCount = arrData.GetUpperBound(1);
+            //int rowCount = arrData.GetUpperBound(0);
+            //int colCount = arrData.GetUpperBound(1);
             //if (colCount < 7) throw new Exception("Не верные вхрдные данные ШБ.");
 
-            List<string> ObjName = new List<string>();
-            for (int i = 2; i <= colCount; i++)
-            {
-                string jbvNameElem = getStringFromXML(arrData[3, i]);
-                if (jbvNameElem.Contains("Вариант"))
-                    ObjName.Add(jbvNameElem);
-            }
+            Dictionary<int, string> ObjName = new Dictionary<int, string>();
+            //for (int i = 2; i <= colCount; i++)
+            //{
+            //    string jbvNameElem = getStringFromXML(arrData[3, i]);
+            //    if (jbvNameElem.Contains("Вариант"))
+            //        ObjName.Add(i, jbvNameElem);
+            //}
 
             List<RP_elem> aList = new List<RP_elem>();
             Dictionary<string, List<RP_elem>> city_USPD = new Dictionary<string, List<RP_elem>>();
             string cityName = "";
-            for (int i = 4; i <= rowCount; i++)
-            {
-                string aName = getStringFromXML(arrData[i, 1]);
-                if (aName != "")
-                {
-                    if (aName.Contains("ПС"))
-                    {
-                        if (i > 4)
-                            USPD.Add(cityName, city_USPD);
-                        cityName = aName;
-                        city_USPD = new Dictionary<string, List<RP_elem>>();
-                    }
-                    else
-                    {
-                        aList = new List<RP_elem>();
-                        for (int j = 2; j <= ObjName.Count + 1; j++)
-                        {
-                            int aCount = getIntFromXML(arrData[i, j]);
-                            if (aCount > 0)
-                                aList.Add(new RP_elem(ObjName[j - 2], aCount));
-                        }
-                        city_USPD.Add(aName, aList);
-                    }
-                }
-            }
+            //for (int i = 4; i <= rowCount; i++)
+            //{
+            //    string aName = getStringFromXML(arrData[i, 1]);
+            //    if (aName != "")
+            //    {
+            //        if (aName.Contains("ПС"))
+            //        {
+            //            if (i > 4)
+            //                USPD.Add(cityName, city_USPD);
+            //            cityName = aName;
+            //            city_USPD = new Dictionary<string, List<RP_elem>>();
+            //        }
+            //        else
+            //        {
+            //            aList = new List<RP_elem>();
+            //            foreach (int j in ObjName.Keys)
+            //            {
+            //                int aCount = getIntFromXML(arrData[i, j]);
+            //                if (aCount > 0)
+            //                    aList.Add(new RP_elem(ObjName[j], aCount));
+            //            }
+            //            city_USPD.Add(aName, aList);
+            //        }
+            //    }
+            //}
 
-            rowCount = arrData2.GetUpperBound(0);
-            colCount = arrData2.GetUpperBound(1);
+            int rowCount = arrData2.GetUpperBound(0);
+            int colCount = arrData2.GetUpperBound(1);
             //if (colCount < 7) throw new Exception("Не верные вхрдные данные ШБ.");
 
-            ObjName = new List<string>();
+            ObjName = new Dictionary<int, string>();
             for (int i = 2; i <= colCount; i++)
             {
                 string jbvNameElem = getStringFromXML(arrData2[3, i]);
-                if (jbvNameElem.Contains("/"))
-                    ObjName.Add(jbvNameElem);
+                if (jbvNameElem.Contains("/") | jbvNameElem.Contains(">=2 ТТ"))
+                    ObjName.Add(i ,jbvNameElem);
             }
 
             aList = new List<RP_elem>();
@@ -507,11 +600,14 @@ namespace DevicesSpecification
                     else
                     {
                         aList = new List<RP_elem>();
-                        for (int j = 2; j <= ObjName.Count + 1; j++)
+                        foreach (int j in ObjName.Keys)
                         {
                             int aCount = getIntFromXML(arrData2[i, j]);
                             if (aCount > 0)
-                                aList.Add(new RP_elem(ObjName[j - 2], aCount));
+                            {
+                                string tName = ObjName[j];
+                                aList.Add(new RP_elem(ObjName[j], aCount));
+                            }
                         }
                         fider_USPD.Add(aName, aList);
                     }
@@ -523,12 +619,12 @@ namespace DevicesSpecification
             rowCount = arrData3.GetUpperBound(0);
             colCount = arrData3.GetUpperBound(1);
 
-            ObjName = new List<string>();
+            ObjName = new Dictionary<int, string>();
             for (int i = 2; i <= colCount; i++)
             {
                 string jbvNameElem = getStringFromXML(arrData3[3, i]);
                 if (jbvNameElem.Contains("№"))
-                    ObjName.Add(jbvNameElem);
+                    ObjName.Add(i,jbvNameElem);
             }
             cityName = "";
             Dictionary<string, List<RP_elem>> fiderList = new Dictionary<string, List<RP_elem>>();
@@ -537,13 +633,13 @@ namespace DevicesSpecification
                 string aName = getStringFromXML(arrData3[i, 1]);
                 if (aName.Contains("№"))
                 {
-                    for (int j = 2; j <= ObjName.Count + 1; j++)
+                    foreach (int j in ObjName.Keys)
                     {
                         int aCount = getIntFromXML(arrData3[i, j]);
                         if (aCount > 0)
                         {
-                            if (!fiderList.ContainsKey(ObjName[j - 2])) fiderList.Add(ObjName[j - 2], new List<RP_elem>());
-                            fiderList[ObjName[j - 2]].Add(new RP_elem(aName, aCount));
+                            if (!fiderList.ContainsKey(ObjName[j])) fiderList.Add(ObjName[j], new List<RP_elem>());
+                            fiderList[ObjName[j]].Add(new RP_elem(aName, aCount));
                         }
                     }
                 }
@@ -557,7 +653,33 @@ namespace DevicesSpecification
             }
             PU.Add(cityName, fiderList);
 
+            rowCount = arrData4.GetUpperBound(0);
+            colCount = arrData4.GetUpperBound(1);
+            for (int i = 2; i <= rowCount; i++)
+            {
+                string ttName = getStringFromXML(arrData4[i, 25]);
+                if (ttName.Contains(">=2 ТТ"))
+                {
+                    string uspdName = getStringFromXML(arrData4[i, 26]);
+                    string psName = getStringFromXML(arrData4[i, 3]);
+                    string vaName = getStringFromXML(arrData4[i, 8]);
+                    string fiName = getStringFromXML(arrData4[i, 4]);
+                    string key = psName.Trim() + "Фидер №" + fiName.Trim() + uspdName.Trim();
+                    if (!tt2List.ContainsKey(key))
+                        tt2List.Add(key, vaName);
+                }
+            }
+
             loging(0, "Чтение файла завершено успешно");
+        }
+
+        public string getVaName(string psName, string fiName, string uspdName)
+        {
+            string key = psName.Trim() + fiName.Trim() + uspdName.Trim();
+            if (tt2List.ContainsKey(key))
+                return tt2List[key];
+            else
+                return "";
         }
 
         void Form1_DragEnter(object sender, DragEventArgs e)
