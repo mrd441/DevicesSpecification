@@ -16,6 +16,7 @@
             if (disposing && (components != null))
             {
                 components.Dispose();
+                xlApp.Quit();
             }
             base.Dispose(disposing);
         }
@@ -48,7 +49,7 @@
             this.logBox.Dock = System.Windows.Forms.DockStyle.Fill;
             this.logBox.Location = new System.Drawing.Point(3, 63);
             this.logBox.Name = "logBox";
-            this.logBox.Size = new System.Drawing.Size(474, 203);
+            this.logBox.Size = new System.Drawing.Size(473, 203);
             this.logBox.TabIndex = 0;
             this.logBox.Text = "";
             // 
@@ -80,7 +81,7 @@
             this.listBox2.IntegralHeight = false;
             this.listBox2.Location = new System.Drawing.Point(102, 3);
             this.listBox2.Name = "listBox2";
-            this.listBox2.Size = new System.Drawing.Size(93, 263);
+            this.listBox2.Size = new System.Drawing.Size(94, 263);
             this.listBox2.TabIndex = 3;
             // 
             // start
@@ -98,7 +99,7 @@
             this.textBox1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.textBox1.Location = new System.Drawing.Point(3, 33);
             this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(474, 20);
+            this.textBox1.Size = new System.Drawing.Size(473, 20);
             this.textBox1.TabIndex = 6;
             // 
             // tableLayoutPanel1
@@ -132,7 +133,7 @@
             this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
             this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 30F));
             this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 133F));
-            this.tableLayoutPanel2.Size = new System.Drawing.Size(480, 269);
+            this.tableLayoutPanel2.Size = new System.Drawing.Size(479, 269);
             this.tableLayoutPanel2.TabIndex = 4;
             // 
             // tableLayoutPanel3
@@ -143,12 +144,12 @@
             this.tableLayoutPanel3.Controls.Add(this.listBox1, 0, 0);
             this.tableLayoutPanel3.Controls.Add(this.listBox2, 1, 0);
             this.tableLayoutPanel3.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tableLayoutPanel3.Location = new System.Drawing.Point(483, 3);
+            this.tableLayoutPanel3.Location = new System.Drawing.Point(482, 3);
             this.tableLayoutPanel3.Margin = new System.Windows.Forms.Padding(0, 3, 3, 3);
             this.tableLayoutPanel3.Name = "tableLayoutPanel3";
             this.tableLayoutPanel3.RowCount = 1;
             this.tableLayoutPanel3.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            this.tableLayoutPanel3.Size = new System.Drawing.Size(198, 269);
+            this.tableLayoutPanel3.Size = new System.Drawing.Size(199, 269);
             this.tableLayoutPanel3.TabIndex = 5;
             // 
             // Form1

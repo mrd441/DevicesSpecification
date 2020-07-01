@@ -4,6 +4,7 @@ using System.ComponentModel.Design.Serialization;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Excel = Microsoft.Office.Interop.Excel;
@@ -38,6 +39,7 @@ namespace DevicesSpecification
 
         public Dictionary<string, Dictionary<string, string>> shifrs;
         public Dictionary<string, string> tt2List;
+        public Excel.Application xlApp;
 
         public struct RP_elem
         {
@@ -55,7 +57,8 @@ namespace DevicesSpecification
 
         public Form1()
         {
-            InitializeComponent();
+            
+            InitializeComponent();            
             this.DragEnter += new DragEventHandler(Form1_DragEnter);
             this.DragDrop += new DragEventHandler(Form1_DragDrop);
             this.Shown += new System.EventHandler(this.Form1_Shown);
@@ -63,6 +66,7 @@ namespace DevicesSpecification
         }
         private async void Form1_Shown(object sender, EventArgs e)
         {
+            //Excel.Application xlApp = new Excel.Application();
             ListShB1 = new Dictionary<string, List<ShB_elem>>();
             ListShB2 = new Dictionary<string, List<ShB_elem>>();
             tt2List = new Dictionary<string, string>();
@@ -76,7 +80,7 @@ namespace DevicesSpecification
             isLoading(false);
         }
 
-        public void LoadSettings(string file)
+        public async void LoadSettings(string file)
         {
             try
             {
@@ -84,7 +88,8 @@ namespace DevicesSpecification
                 isLoading(true);
                 ListShB1.Clear();
                 ListShB2.Clear();
-                Excel.Application xlApp = new Excel.Application();
+
+                xlApp = new Excel.Application();
                 Excel.Workbook xlWB;
                 Excel.Worksheet xlSht;
                 xlWB = xlApp.Workbooks.Open(file);
@@ -98,7 +103,10 @@ namespace DevicesSpecification
                 var arrData2 = (object[,])xlSht.get_Range("A1", last).Value;
 
                 xlWB.Close(false);
+                Thread.Sleep(1000);
                 xlApp.Quit();
+                Thread.Sleep(1000);
+                //await Task.Delay(1000);
 
                 int rowCount = arrData.GetUpperBound(0);
                 int colCount = arrData.GetUpperBound(1);
@@ -168,14 +176,14 @@ namespace DevicesSpecification
             isLoading(false);
         }
 
-        public void LoadShifrs(string file)
+        public async void LoadShifrs(string file)
         {
             try
             {
                 loging(1, "Загрузка шифров...");
                 isLoading(true);
                 shifrs = new Dictionary<string, Dictionary<string, string>>();
-                Excel.Application xlApp = new Excel.Application();
+                xlApp = new Excel.Application();
                 Excel.Workbook xlWB;
                 Excel.Worksheet xlSht;
                 xlWB = xlApp.Workbooks.Open(file);
@@ -185,7 +193,10 @@ namespace DevicesSpecification
                 var arrData = (object[,])xlSht.get_Range("A1", last).Value;
 
                 xlWB.Close(false);
+                Thread.Sleep(1000);
                 xlApp.Quit();
+                Thread.Sleep(1000);
+                //await Task.Delay(1000);
 
                 int rowCount = arrData.GetUpperBound(0);
                 int colCount = arrData.GetUpperBound(1);
@@ -281,7 +292,7 @@ namespace DevicesSpecification
             }
         }
 
-        public void GenerateData()
+        public async void GenerateData()
         {
             
             loging(0, "Формирование выходных данных");
@@ -292,12 +303,13 @@ namespace DevicesSpecification
 
             
             string tmpFileName = textBox1.Text.Split('\\').Last();
-            string resName = tmpFileName.Replace(" Реестр потребителей.xlsx", "");
+
+            string resName = tmpFileName.Trim().Replace("_", " ").Replace(" Реестр потребителей.xlsx", "");
             string tmpDirName = textBox1.Text.Replace(".xlsx", "_result");
             if (!Directory.Exists(tmpDirName))
                 Directory.CreateDirectory(tmpDirName);
 
-            Excel.Application xlApp = new Excel.Application();
+            xlApp = new Excel.Application();
             Excel.Workbook xlWB;
             Excel.Worksheet xlSht; 
             
@@ -313,14 +325,14 @@ namespace DevicesSpecification
                 foreach (string fider in PU[city].Keys)
                 {
                     result.Add(new ShB_elem("", city + " " + fider, "", "", 0, ""));
-                    caption1List.Add(result.Count+3 + incrementIndex(result.Count));
+                    caption1List.Add(result.Count+2 + incrementIndex(result.Count));
 
                     foreach (RP_elem RP in PU[city][fider])
                     {
                         string varName = RP.Name;
                         int varCount = RP.Count;
                         result.Add(new ShB_elem("", varName, "", "", 0, ""));
-                        caption2List.Add(result.Count+ 3 + incrementIndex(result.Count));
+                        caption2List.Add(result.Count+ 2 + incrementIndex(result.Count));
 
                         try
                         {
@@ -329,7 +341,7 @@ namespace DevicesSpecification
                                 ShB_elem newEl = el;
                                 newEl.Count = newEl.Count * varCount;
                                 result.Add(newEl);
-                                if (newEl.ColC.Length > 24) londTextList.Add(result.Count + 3 + incrementIndex(result.Count));
+                                if (newEl.ColC.Length > 24) londTextList.Add(result.Count + 2 + incrementIndex(result.Count));
                             }
                         }
                         catch (Exception ex)
@@ -341,7 +353,7 @@ namespace DevicesSpecification
                         foreach (string varName2 in TT[city][fider].Keys)
                         {
                             result.Add(new ShB_elem("", varName2, "", "", 0, ""));
-                            caption2List.Add(result.Count+ 3 + incrementIndex(result.Count));
+                            caption2List.Add(result.Count+ 2 + incrementIndex(result.Count));
 
                             int varCount2 = 0;
                             foreach (RP_elem RP in TT[city][fider][varName2])                            
@@ -392,7 +404,7 @@ namespace DevicesSpecification
                     arr[i, 8] = el.ColI;
                 }
 
-                double pageCount1 = (result.Count - 23) / 29;
+                double pageCount1 = (result.Count - 24) / 29;
                 double pageCount2 = Math.Ceiling(pageCount1)+1;
                 double pageCount = (pageCount1 > 0) ? 39 + pageCount2 * 37 : 39;
 
@@ -411,9 +423,16 @@ namespace DevicesSpecification
                     loging(2, "не найден шифр для " + resName + " " + city);
 
                 xlSht = (Excel.Worksheet)xlWB.Worksheets[3];
+               // xlSht.HPageBreaks[4].Location = xlSht.get_Range("A152");
+                //xlSht.VPageBreaks .Location = xlSht.get_Range("A152");
                 string shtName = city;
-                xlSht.PageSetup.PrintArea = "$A$2:$AA$"+ pageCount.ToString();
-               
+                xlSht.PageSetup.PrintArea = "$A$1:$AA$"+ pageCount.ToString();
+                xlSht.PageSetup.LeftMargin = 0;// 28.346456692913389;
+                xlSht.PageSetup.TopMargin = 48.188976377952756;
+                xlSht.PageSetup.RightMargin = 0;
+                xlSht.PageSetup.BottomMargin = 0;
+                xlSht.PageSetup.Zoom = 95;
+
                 xlSht.get_Range("Z35").Value = (pageCount2+1).ToString();
                 xlSht.get_Range("R34").Value = DateTime.Now.ToString("dd.MM.yyy");
                 xlSht.get_Range("S34").Value = city;
@@ -442,7 +461,7 @@ namespace DevicesSpecification
                 string newFileFullName = tmpDirName + "\\";// + tmpFileName.Replace(".xlsx", "_" + city + ".xlsx");
                 if (ttError)
                     newFileFullName = newFileFullName + "!!";
-                newFileFullName  = newFileFullName + tmpFileName.Replace(".xlsx", "_" + city + ".xlsx");
+                newFileFullName = newFileFullName + city + " СО.xlsx";//tmpFileName.Replace(".xlsx", "_" + city + ".xlsx");
                 xlWB.SaveAs(newFileFullName);
                 xlSht.ExportAsFixedFormat(Excel.XlFixedFormatType.xlTypePDF, newFileFullName.Replace(".xlsx", ".pdf"));
                 if (ttError)
@@ -453,10 +472,18 @@ namespace DevicesSpecification
                 caption1List.Clear();
                 caption2List.Clear();
                 xlWB.Close(false);
+                Thread.Sleep(1000);
+
             }
             //29 24
-            
+            foreach(Excel.Workbook qwe in xlApp.Workbooks)
+            {
+                qwe.Close(false);
+                Thread.Sleep(1000);
+            }
             xlApp.Quit();
+            Thread.Sleep(1000);
+            //await Task.Delay(1000);
             loging(0, "Формирование выходных данных успешно завершено");
             
         }
@@ -464,25 +491,25 @@ namespace DevicesSpecification
         public int incrementIndex(double rowCount)
         {
             int result = 0;
-            double pageCount1 = Math.Ceiling((rowCount - 23) / 29);
+            double pageCount1 = Math.Ceiling((rowCount - 24) / 29)+1;
             int pageCount = Convert.ToInt32(pageCount1);
-            if (pageCount > 0)
-                result = 15 + (pageCount - 1) * 8;
-            if (pageCount > 8)
-                result++;
-            if (pageCount == 9)
-                result++;
+            if (pageCount > 1)
+                result = 15 + (pageCount-2) * 8;
+            //if (pageCount > 8)
+            //    result++;
+            //if (pageCount == 9)
+            //    result++;
             return result;
         }
 
-        public void loadFilters()
+        public async void loadFilters()
         {
             TT.Clear();
             USPD.Clear();
             PU.Clear();
             tt2List.Clear();
             loging(0, "Чтение файла");
-            Excel.Application xlApp = new Excel.Application();
+            xlApp = new Excel.Application();
             Excel.Workbook xlWB;
             Excel.Worksheet xlSht;
             Excel.Range last;
@@ -510,7 +537,10 @@ namespace DevicesSpecification
             var arrData4 = (object[,])xlSht.get_Range("A1", last).Value;
 
             xlWB.Close(false);
+            Thread.Sleep(1000);
             xlApp.Quit();
+            Thread.Sleep(1000);
+            //await Task.Delay(1000);
 
             //int rowCount = arrData.GetUpperBound(0);
             //int colCount = arrData.GetUpperBound(1);
